@@ -54,7 +54,8 @@
     "superagent": "^8.0.9",
     "try-json": "1.0.0",
     "yauzl": "2.6.0",
-    "yazl": "2.2.2"
+    "yazl": "2.2.2",
+    "@aws-sdk/lib-storage": "3.787.0"
   },
   "devDependencies": {
     "@types/express": "^4.17.17",
