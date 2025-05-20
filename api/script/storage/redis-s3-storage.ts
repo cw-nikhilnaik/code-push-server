@@ -145,12 +145,12 @@ export class RedisS3Storage implements storage.Storage {
   }
 
   public getAccountByEmail(email: string): Promise<storage.Account> {
-for (const id in this.accounts) {
+    for (const id in this.accounts) {
       if (this.accounts[id].email === email) {
-	if(!this.emailToAccountMap[email]){
-		this.emailToAccountMap[email] = id;
-		this.saveStateAsync();
-	}
+        if (!this.emailToAccountMap[email]) {
+          this.emailToAccountMap[email] = id;
+          this.saveStateAsync();
+        }
         return q(clone(this.accounts[id]));
       }
     }
@@ -329,7 +329,7 @@ for (const id in this.accounts) {
       }
 
       const targetCollaboratorAccountId: string = this.emailToAccountMap[email.toLowerCase()];
-      
+
       if (!targetCollaboratorAccountId) {
         return RedisS3Storage.getRejectedPromise(storage.ErrorCode.NotFound, RedisS3Storage.CollaboratorNotFound);
       }
@@ -536,26 +536,26 @@ for (const id in this.accounts) {
   }
 
   public addBlob(blobId: string, stream: stream.Readable, streamLength: number): q.Promise<string> {
-  const upload = new Upload({
-    client: this.s3Client,
-    params: {
-      Bucket: process.env.AWS_BUCKET_NAME!,
-      Key: blobId,
-      Body: stream,
-    },
-  });
+    const upload = new Upload({
+      client: this.s3Client,
+      params: {
+        Bucket: process.env.AWS_BUCKET_NAME!,
+        Key: blobId,
+        Body: stream,
+      },
+    });
 
-  return q.Promise<string>((resolve, reject) => {
-    upload.done()
-      .then(() => {
-        this.blobs[blobId] = `https://${process.env.CDN_NAME}/${blobId}`;
-        this.saveStateAsync()
-          .then(() => resolve(blobId))
-          .catch(reject);
-      })
-      .catch(reject);
-  });
-}
+    return q.Promise<string>((resolve, reject) => {
+      upload.done()
+        .then(() => {
+          this.blobs[blobId] = `https://${process.env.CDN_NAME}/${blobId}`;
+          this.saveStateAsync()
+            .then(() => resolve(blobId))
+            .catch(reject);
+        })
+        .catch(reject);
+    });
+  }
 
 
 
