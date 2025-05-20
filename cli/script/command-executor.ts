@@ -561,7 +561,9 @@ function fileDoesNotExistOrIsDirectory(filePath: string): boolean {
 function getTotalActiveFromDeploymentMetrics(metrics: DeploymentMetrics): number {
   let totalActive = 0;
   Object.keys(metrics).forEach((label: string) => {
-    totalActive += metrics[label].active;
+    if(metrics[label].active > 0) {
+      totalActive += metrics[label].active;
+    }
   });
 
   return totalActive;
