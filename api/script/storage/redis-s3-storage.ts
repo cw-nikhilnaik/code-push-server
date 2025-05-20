@@ -15,6 +15,7 @@ import { isPrototypePollutionKey } from "./storage";
 import path = require("path");
 import Redis from "ioredis";
 import { DeleteObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { Upload } from "@aws-sdk/lib-storage";
 
 function merge(original: any, updates: any): void {
   for (const property in updates) {
@@ -56,10 +57,6 @@ export class RedisS3Storage implements storage.Storage {
     this.redisClient = new Redis();
     this.s3Client = new S3Client({
       region: process.env.AWS_REGION,
-      credentials: {
-        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-        secretAccessKey: process.env.AWS_SECRET_ACCESS,
-      },
     });
     if (!fs.existsSync(this.updatesDir)) {
       fs.mkdirSync(this.updatesDir);
@@ -102,6 +99,7 @@ export class RedisS3Storage implements storage.Storage {
       blobs: this.blobs,
       accountToAppsMap: this.accountToAppsMap,
       appToAccountMap: this.appToAccountMap,
+      emailToAccountMap: this.emailToAccountMap,
       appToDeploymentsMap: this.appToDeploymentsMap,
       deploymentToAppMap: this.deploymentToAppMap,
       deploymentKeyToDeploymentMap: this.deploymentKeyToDeploymentMap,
@@ -149,6 +147,10 @@ export class RedisS3Storage implements storage.Storage {
   public getAccountByEmail(email: string): Promise<storage.Account> {
     for (const id in this.accounts) {
       if (this.accounts[id].email === email) {
+        if (!this.emailToAccountMap[email]) {
+          this.emailToAccountMap[email] = id;
+          this.saveStateAsync();
+        }
         return q(clone(this.accounts[id]));
       }
     }
@@ -327,6 +329,7 @@ export class RedisS3Storage implements storage.Storage {
       }
 
       const targetCollaboratorAccountId: string = this.emailToAccountMap[email.toLowerCase()];
+
       if (!targetCollaboratorAccountId) {
         return RedisS3Storage.getRejectedPromise(storage.ErrorCode.NotFound, RedisS3Storage.CollaboratorNotFound);
       }
@@ -532,30 +535,29 @@ export class RedisS3Storage implements storage.Storage {
     return q(<void>null);
   }
 
-  public addBlob(blobId: string, stream: stream.Readable, streamLength: number): Promise<string> {
-    const params = {
-      Bucket: process.env.AWS_BUCKET_NAME,
-      Key: blobId,
-      Body: stream,
-    };
+  public addBlob(blobId: string, stream: stream.Readable, streamLength: number): q.Promise<string> {
+    const upload = new Upload({
+      client: this.s3Client,
+      params: {
+        Bucket: process.env.AWS_BUCKET_NAME!,
+        Key: blobId,
+        Body: stream,
+      },
+    });
 
-    return q
-      .Promise<string>((resolve, reject) => {
-        this.s3Client
-          .send(new PutObjectCommand(params))
-          .then(() => {
-            resolve(blobId);
-          })
-          .catch(reject);
-      })
-      .then(() => {
-        this.blobs[blobId] = `https://${process.env.AWS_BUCKET_NAME}.s3.amazonaws.com/${blobId}`;
-
-        this.saveStateAsync();
-
-        return blobId;
-      });
+    return q.Promise<string>((resolve, reject) => {
+      upload.done()
+        .then(() => {
+          this.blobs[blobId] = `https://${process.env.CDN_NAME}/${blobId}`;
+          this.saveStateAsync()
+            .then(() => resolve(blobId))
+            .catch(reject);
+        })
+        .catch(reject);
+    });
   }
+
+
 
   public getBlobUrl(blobId: string): Promise<string> {
     return q.Promise<string>((resolve, reject) => {
